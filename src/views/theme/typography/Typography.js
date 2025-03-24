@@ -12,28 +12,98 @@ function App() {
     date: '',
   })
 
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
+  const validateField = (name, value) => {
+    let error = ''
+
+    switch (name) {
+      case 'firstName':
+      case 'lastName':
+        if (!value.match(/^[a-zA-Z\s]{2,}$/)) {
+          error = `${name === 'firstName' ? 'First' : 'Last'} name must be at least 2 characters and contain only letters`
+        }
+        break
+      case 'phone':
+        if (!value) {
+          error = 'Phone number is required'
+        } else if (!value.match(/^\d+$/)) {
+          error = 'Phone number must contain only digits'
+        }
+        break
+      case 'nationalId':
+        if (!value.match(/^[a-zA-Z0-9]{4,}$/)) {
+          error = 'National ID must be at least 4 characters (letters and numbers allowed)'
+        }
+        break
+      case 'email':
+        if (!value.match(/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/)) {
+          error = 'Please enter a valid email address'
+        }
+        break
+      case 'allocationTime':
+        if (!value) {
+          error = 'Please select a time'
+        }
+        break
+      case 'date':
+        if (!value) {
+          error = 'Please select a date'
+        } else {
+          const selectedDate = new Date(value)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0) // Reset time to midnight for accurate comparison
+          if (selectedDate < today) {
+            error = 'Date must be today or later'
+          }
+        }
+        break
+      default:
+        break
+    }
+    return error
+  }
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+
+    // Validate field on change
+    const error = validateField(name, value)
+    setErrors((prev) => ({ ...prev, [name]: error }))
+  }
+
+  const validateForm = () => {
+    const newErrors = {}
+    Object.keys(formData).forEach((key) => {
+      const error = validateField(key, formData[key])
+      if (error) newErrors[key] = error
+    })
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!validateForm()) {
+      setMessage('Please fix all errors before submitting')
+      return
+    }
+
     setLoading(true)
     setMessage('')
 
-    // Convert date format from DD-MM-YYYY to YYYY-MM-DD
     const formattedDate = formData.date.split('-').reverse().join('-')
-
     const formattedData = {
       ...formData,
-      phoneNumber: formData.phone, // Ensure field name matches backend
-      date: formattedDate, // Use YYYY-MM-DD format
+      phoneNumber: formData.phone,
+      date: formattedDate,
     }
 
-    console.log('Sending Data:', formattedData) // Debugging log
+    console.log('Sending Data:', formattedData)
 
     try {
       const response = await axios.post('http://localhost:3001/visitors', formattedData, {
@@ -42,7 +112,6 @@ function App() {
 
       console.log('Response:', response.data)
       setMessage('Visitor data successfully submitted!')
-
       setFormData({
         firstName: '',
         lastName: '',
@@ -52,6 +121,7 @@ function App() {
         allocationTime: '',
         date: '',
       })
+      setErrors({})
     } catch (error) {
       console.error('Error:', error.response?.data || error.message)
       setMessage(`Error: ${error.response?.data?.message || 'Internal server error'}`)
@@ -108,30 +178,37 @@ function App() {
               { label: 'Allocation Time', name: 'allocationTime', type: 'time' },
               { label: 'Date', name: 'date', type: 'date' },
             ].map(({ label, name, type = 'text' }) => (
-              <div
-                key={name}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <label
-                  style={{ fontWeight: 'bold', fontSize: '1rem', color: '#333', width: '40%' }}
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  {label}
-                </label>
-                <input
-                  type={type}
-                  name={name}
-                  value={formData[name]}
-                  onChange={handleChange}
-                  required
-                  style={{
-                    flex: 1,
-                    padding: '12px 15px',
-                    border: '2px solid #eee',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    background: '#f8f9fa',
-                  }}
-                />
+                  <label
+                    style={{ fontWeight: 'bold', fontSize: '1rem', color: '#333', width: '40%' }}
+                  >
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    name={name}
+                    value={formData[name]}
+                    onChange={handleChange}
+                    required
+                    style={{
+                      flex: 1,
+                      padding: '12px 15px',
+                      border: '2px solid #eee',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      background: '#f8f9fa',
+                      borderColor: errors[name] ? 'red' : '#eee',
+                    }}
+                  />
+                </div>
+                {errors[name] && (
+                  <span style={{ color: 'red', fontSize: '0.8rem', marginLeft: '40%' }}>
+                    {errors[name]}
+                  </span>
+                )}
               </div>
             ))}
           </div>
